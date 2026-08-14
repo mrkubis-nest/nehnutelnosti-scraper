@@ -1,0 +1,73 @@
+name: Scrape nehnutelnosti.sk
+
+on:
+  schedule:
+    # Časy sú v UTC. Leto na Slovensku = UTC+2, zima = UTC+1.
+    # 05:00, 11:00 a 17:00 UTC ≈ 7:00, 13:00 a 19:00 nášho času (v lete).
+    - cron: "0 5,11,17 * * *"
+  workflow_dispatch:        # umožní spustiť ručne tlačidlom v záložke Actions
+
+# Zabráni súbežnému behu, keby predchádzajúci ešte dobiehal.
+concurrency:
+  group: scrape
+  cancel-in-progress: false
+
+permissions:
+  contents: write           # commit databázy späť do repozitára
+  pages: write              # publikovanie stránky
+  id-token: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Inštalácia závislostí
+        run: pip install -r requirements.txt
+
+      - name: Scrapovanie
+        env:
+          EXCEL_ENABLED: "true"
+          WEB_ENABLED: "true"
+          HTML_ENABLED: "false"
+          CSV_ENABLED: "false"
+          SHEETS_ENABLED: "false"
+          EMAIL_ENABLED: "false"
+          DB_PATH: data/seen.sqlite3
+          EXCEL_PATH: public/ponuky.xlsx
+          WEB_PATH: public/index.html
+          REQUEST_DELAY: "1.0"
+        run: python run.py
+
+      - name: Uloženie databázy do repozitára
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A data public
+          if git diff --staged --quiet; then
+            echo "Žiadne zmeny."
+          else
+            git commit -m "Aktualizácia ponúk – $(date -u '+%Y-%m-%d %H:%M UTC')"
+            git push
+          fi
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    needs: scrape
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,107 @@
+# Konfigurácia vyhľadávania na nehnutelnosti.sk
+#
+# Web nepodporuje filter "priamo od majiteľa" v URL a stránkovanie končí
+# na 33. strane (~990 inzerátov). Preto sa prehľadávanie rozdeľuje na menšie
+# časti (kategória × okres), aby sa žiadny výsledok neschoval za limitom.
+# Filtrovanie na majiteľov prebieha až lokálne, cez pole advertiser.type.
+
+transaction: predaj          # predaj | prenajom
+
+# Okresy Bratislavského kraja (slugy z URL webu).
+#
+# POZOR na prefix `okres-`: slug `senec` znamená MESTO Senec (138 domov),
+# kým `okres-senec` je celý okres (773 domov). Bez prefixu by scraper
+# prehliadol ~29 % ponúk v kraji. Pri Bratislave I–V sú obe formy zhodné,
+# prefix je tam pre konzistenciu.
+districts:
+  - okres-bratislava-i
+  - okres-bratislava-ii
+  - okres-bratislava-iii
+  - okres-bratislava-iv
+  - okres-bratislava-v
+  - okres-malacky
+  - okres-pezinok
+  - okres-senec
+
+# Hlavné kategórie. `subcategories` sa použijú len ak partícia prekročí
+# limit stránkovania – vtedy sa rozdelí ešte jemnejšie.
+categories:
+  - slug: byty
+    subcategories:
+      - garsonky
+      - 1-izbove-byty
+      - 2-izbove-byty
+      - 3-izbove-byty
+      - 4-izbove-byty
+      - 5-a-viac-izbove-byty
+      - mezonety
+      - lofty
+  - slug: domy
+    subcategories: []
+  - slug: pozemky
+    subcategories:
+      - pozemky-rodinne-domy
+      - komercne-pozemky
+      - rekreacne-pozemky
+      - zahrady
+      - polnohospodarske-lesne-pozemky
+  - slug: priestory-a-objekty
+    subcategories:
+      - kancelarie-administrativa
+      - obchody
+      - restauracie
+      - sklady
+      - garaze-parkovanie
+  - slug: rekreacne-nehnutelnosti
+    subcategories: []
+
+# Voliteľné filtre aplikované lokálne na nájdené ponuky.
+# Nechaj prázdne (null) ak nechceš filtrovať.
+filters:
+  # Ignorovať ponuky staršie ako X dní. Platí vždy – aj pri prvom behu,
+  # aj pri ďalších, aj pri generovaní Excelu. 120 dní = 4 mesiace.
+  max_age_days: 120
+
+  min_price: null            # napr. 80000
+  max_price: null            # napr. 350000
+  min_area: null             # m², napr. 40
+  max_area: null
+
+  # Koľko dní dozadu ešte označovať ponuky ako "Nové" pri úplne prvom behu.
+  first_run_max_age_days: 30
+
+  # Ponuku, ktorú scraper toľko dní nenašiel na webe, považuj za stiahnutú
+  # alebo predanú a do Excelu ju už nedávaj (viedla by na mŕtvy odkaz).
+  # 3 dni sú odolné voči jednému neúspešnému behu či výpadku siete.
+  stale_after_days: 3
+
+# Druhá vrstva ochrany pred realitkami.
+#
+# Web označuje inzerenta ako súkromnú osobu podľa typu účtu, nie podľa toho,
+# či podniká s realitami – takže časť firiem inzeruje zo súkromného účtu
+# (napr. "Reality Market", "N HOMES sro", "Pride Group"). Ponuky, ktorých
+# meno inzerenta sedí na niektorý z týchto vzorov, sa zahodia.
+#
+# Zmaž riadok, ak niektorý vzor odfiltruje aj skutočného majiteľa.
+exclude_advertiser_patterns:
+  - '\bs\.?\s?r\.?\s?o\.?\b'
+  - '\ba\.?\s?s\.?\b'
+  - '\bspol\.?\b'
+  - '\bk\.?\s?s\.?\b'
+  - 'realit'
+  - '\breality\b'
+  - '\bestate\b'
+  - '\bhomes\b'
+  - '\bproperty\b'
+  - '\bproperties\b'
+  - '\binvest'
+  - '\bgroup\b'
+  - '\bdevelop'
+  - '\bbroker'
+  - '\bagentúr|\bagentur'
+  - '\bkancelár|\bkancelar'
+  - '\bservis\b'
+
+# Technický limit stránkovania webu – needituj, ak sa web nezmení.
+page_size: 30
+max_pages: 33

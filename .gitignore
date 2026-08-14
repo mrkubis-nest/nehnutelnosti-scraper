@@ -1,0 +1,14 @@
+# Prístupy – NIKDY nesmú ísť do repozitára
+.env
+credentials.json
+
+# Dáta sa naopak commitujú, aby si GitHub Actions pamätal, čo už videl,
+# a aby sa dala publikovať stránka. Ignorujeme len lokálne vedľajšie výstupy.
+data/ponuky.csv
+data/ponuky.html
+
+*.log
+__pycache__/
+*.py[cod]
+.venv/
+venv/
