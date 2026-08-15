@@ -1,0 +1,32 @@
+name: Publikovať stránku
+
+# Zverejní obsah priečinka public/ tak, ako je práve v repozitári – bez
+# nového scrapovania. Hodí sa, keď treba stránku len obnoviť alebo keď
+# scrapovací beh prebehol skôr, než bolo publikovanie zapnuté.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
