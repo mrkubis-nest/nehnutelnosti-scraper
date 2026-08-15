@@ -6,6 +6,7 @@ credentials.json
 # a aby sa dala publikovať stránka. Ignorujeme len lokálne vedľajšie výstupy.
 data/ponuky.csv
 data/ponuky.html
+data/ponuky.xlsx
 
 *.log
 __pycache__/
