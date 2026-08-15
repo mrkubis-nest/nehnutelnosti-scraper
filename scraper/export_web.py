@@ -59,9 +59,18 @@ def _rows(listings: list[Listing], new_ids: set[str]) -> str:
         blob = e(" ".join([l.location, l.advertiser_name, typ, okres]).lower())
         pretty = ".".join(reversed(added.split("-"))) if added else "—"
 
+        # Čas scrapu sa formátuje až v prehliadači, aby každý videl svoj
+        # miestny čas – workflow beží v UTC.
+        seen = e(l.first_seen or "")
+
         out.append(
-            f'<li class="row" data-s="{blob}" data-d="{e(added)}"'
+            f'<li class="row" data-id="{e(l.id)}" data-s="{blob}" data-d="{e(added)}"'
             f' data-t="{e(typ)}" data-o="{e(okres)}">'
+            f'<label class="tick">'
+            f'<input type="checkbox" class="done" data-id="{e(l.id)}"'
+            f' aria-label="Označiť ponuku ako vybavenú">'
+            f'<span aria-hidden="true"></span>'
+            f'</label>'
             f'<div class="main">'
             f'<a class="place" href="{e(l.url)}" target="_blank" rel="noopener">'
             f'{e(l.location)}</a>'
@@ -71,7 +80,10 @@ def _rows(listings: list[Listing], new_ids: set[str]) -> str:
             f'</div></div>'
             f'<div class="side">'
             f'{"<span class=badge>NOVÉ</span>" if l.id in new_ids else ""}'
-            f'<time datetime="{e(added)}">{e(pretty)}</time>'
+            f'<div class="dates">'
+            f'<span class="dl1">inzerát <time datetime="{e(added)}">{e(pretty)}</time></span>'
+            f'<span class="dl2">nájdené <time class="seen" data-iso="{seen}">—</time></span>'
+            f'</div>'
             f'<a class="go" href="{e(l.url)}" target="_blank" rel="noopener"'
             f' aria-label="Otvoriť inzerát">Inzerát<span aria-hidden="true"> →</span></a>'
             f'</div></li>'
@@ -109,12 +121,19 @@ def write(path: str | Path, listings: list[Listing],
 <meta name="robots" content="noindex">
 <meta name="description" content="Ponuky nehnuteľností priamo od majiteľa v Bratislavskom kraji, bez realitných kancelárií.">
 <title>Priamo od majiteľa — Bratislavský kraj</title>
+<script>
+  // Beží pred vykreslením, inak by pri načítaní preblikla nesprávna téma.
+  try {{
+    var t = localStorage.getItem("nsk.theme");
+    if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+  }} catch (e) {{}}
+</script>
 <style>
   :root {{
     --paper:#f0f1f3; --card:#ffffff; --sunk:#e7e9ed;
     --ink:#151a21; --ink-2:#3d4753; --muted:#6b7683; --line:#dfe3e9;
     --accent:#9a5b12; --accent-ink:#7d4a0d; --accent-bg:#f6ecdc;
-    --link:#1a5490;
+    --link:#1a5490; --done:#4a7c3f;
     --byt:#2f6f8f; --byt-bg:#e2eef4;
     --dom:#4a7c3f; --dom-bg:#e6f0e2;
     --poz:#8a6a1f; --poz-bg:#f4eddb;
@@ -129,7 +148,7 @@ def write(path: str | Path, listings: list[Listing],
       --paper:#0f1318; --card:#171d24; --sunk:#1e252d;
       --ink:#e8ecf1; --ink-2:#c2cad4; --muted:#8d98a6; --line:#28303a;
       --accent:#e0a049; --accent-ink:#e8b268; --accent-bg:#2b2216;
-      --link:#6fb0ef;
+      --link:#6fb0ef; --done:#4f8f42;
       --byt:#7fc0dd; --byt-bg:#162d38;
       --dom:#8fce80; --dom-bg:#1a2d18;
       --poz:#d9bb6b; --poz-bg:#2d2716;
@@ -141,7 +160,7 @@ def write(path: str | Path, listings: list[Listing],
     --paper:#0f1318; --card:#171d24; --sunk:#1e252d;
     --ink:#e8ecf1; --ink-2:#c2cad4; --muted:#8d98a6; --line:#28303a;
     --accent:#e0a049; --accent-ink:#e8b268; --accent-bg:#2b2216;
-    --link:#6fb0ef;
+    --link:#6fb0ef; --done:#4f8f42;
     --byt:#7fc0dd; --byt-bg:#162d38;
     --dom:#8fce80; --dom-bg:#1a2d18;
     --poz:#d9bb6b; --poz-bg:#2d2716;
@@ -229,21 +248,57 @@ def write(path: str | Path, listings: list[Listing],
     gap:14px; margin:16px 0 8px; flex-wrap:wrap;
   }}
   .count {{ font-family:var(--mono); font-size:12px; color:var(--muted); letter-spacing:.05em; }}
+  .actions {{ display:flex; gap:16px; align-items:center; flex-wrap:wrap; }}
   .reset {{
     font:inherit; font-size:13px; background:none; border:none; cursor:pointer;
     color:var(--link); text-decoration:underline; padding:0;
   }}
+  .hidedone {{
+    display:inline-flex; gap:7px; align-items:center; font-size:13px;
+    color:var(--ink-2); cursor:pointer; user-select:none;
+  }}
+  .hidedone input {{ accent-color:var(--done); width:15px; height:15px; cursor:pointer; }}
+
+  /* ---------- prepínač témy ---------- */
+  .theme {{
+    display:inline-flex; background:var(--card); border:1px solid var(--line);
+    border-radius:9px; padding:2px; gap:2px; margin-left:auto;
+  }}
+  .theme button {{
+    font:inherit; font-size:12.5px; padding:6px 11px; border:none; cursor:pointer;
+    background:none; color:var(--muted); border-radius:7px; line-height:1.2;
+  }}
+  .theme button:hover {{ color:var(--ink); }}
+  .theme button[aria-pressed="true"] {{ background:var(--sunk); color:var(--ink); font-weight:600; }}
 
   /* ---------- zoznam ---------- */
   ul.list {{ list-style:none; margin:0; padding:0;
              background:var(--card); border:1px solid var(--line); border-radius:12px; }}
   .row {{
-    display:flex; gap:18px; align-items:flex-start; justify-content:space-between;
+    display:flex; gap:14px; align-items:flex-start;
     padding:15px 18px; border-bottom:1px solid var(--line);
   }}
   .row:last-child {{ border-bottom:none; }}
   .row:hover {{ background:var(--sunk); }}
-  .main {{ min-width:0; }}
+  .main {{ min-width:0; flex:1; }}
+
+  /* ---------- odškrtnutie ---------- */
+  .tick {{ flex-shrink:0; padding-top:3px; cursor:pointer; line-height:0; }}
+  .tick input {{ position:absolute; opacity:0; width:0; height:0; }}
+  .tick span {{
+    display:block; width:19px; height:19px; border-radius:5px;
+    border:1.5px solid var(--muted); background:var(--card);
+  }}
+  .tick:hover span {{ border-color:var(--ink); }}
+  .tick input:focus-visible + span {{ outline:2px solid var(--link); outline-offset:2px; }}
+  .tick input:checked + span {{
+    background:var(--done); border-color:var(--done);
+    background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round' d='M3.5 8.4l3 3 6-6.6'/%3E%3C/svg%3E");
+    background-size:15px; background-position:center; background-repeat:no-repeat;
+  }}
+  .row.is-done {{ background:var(--sunk); }}
+  .row.is-done .place {{ text-decoration:line-through; color:var(--muted); }}
+  .row.is-done .main, .row.is-done .dates {{ opacity:.55; }}
   .place {{
     font-family:var(--serif); font-size:18.5px; font-weight:600; line-height:1.28;
     color:var(--ink); text-decoration:none; display:block; letter-spacing:-.005em;
@@ -268,10 +323,13 @@ def write(path: str | Path, listings: list[Listing],
     color:var(--accent-ink); background:var(--accent-bg); border-radius:4px;
     padding:3px 7px;
   }}
-  time {{
-    font-family:var(--mono); font-size:12.5px; color:var(--muted);
-    font-variant-numeric:tabular-nums; white-space:nowrap;
+  .dates {{
+    display:flex; flex-direction:column; gap:2px; text-align:right;
+    font-family:var(--mono); font-size:11px; color:var(--muted);
+    font-variant-numeric:tabular-nums; white-space:nowrap; line-height:1.4;
   }}
+  .dl2 {{ opacity:.78; }}
+  time {{ font-family:inherit; font-variant-numeric:tabular-nums; }}
   .go {{
     font-size:13.5px; font-weight:600; color:var(--link); text-decoration:none;
     white-space:nowrap;
@@ -337,13 +395,23 @@ def write(path: str | Path, listings: list[Listing],
       <option value="loc">Podľa adresy</option>
     </select>
     {dl}
+    <div class="theme" role="group" aria-label="Farebná téma">
+      <button data-theme-set="auto">Auto</button>
+      <button data-theme-set="light">Svetlá</button>
+      <button data-theme-set="dark">Tmavá</button>
+    </div>
   </div>
   <div class="chips" id="chips">{chips}</div>
 </div>
 
 <div class="status">
   <span class="count" id="count"></span>
-  <button class="reset" id="reset" hidden>Zrušiť filtre</button>
+  <div class="actions">
+    <label class="hidedone">
+      <input type="checkbox" id="hidedone"> Skryť vybavené
+    </label>
+    <button class="reset" id="reset" hidden>Zrušiť filtre</button>
+  </div>
 </div>
 
 <ul class="list" id="list">
@@ -366,34 +434,108 @@ def write(path: str | Path, listings: list[Listing],
       sort = document.getElementById('sort'),
       count = document.getElementById('count'),
       reset = document.getElementById('reset'),
+      hideDone = document.getElementById('hidedone'),
       chips = [].slice.call(document.querySelectorAll('.fchip')),
       all = [].slice.call(list.children),
       okres = null;
 
+  /* ---------- téma ---------- */
+  var themeBtns = [].slice.call(document.querySelectorAll('[data-theme-set]'));
+  function readTheme() {{
+    try {{ return localStorage.getItem('nsk.theme') || 'auto'; }} catch (e) {{ return 'auto'; }}
+  }}
+  function applyTheme(mode) {{
+    if (mode === 'auto') delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = mode;
+    try {{
+      if (mode === 'auto') localStorage.removeItem('nsk.theme');
+      else localStorage.setItem('nsk.theme', mode);
+    }} catch (e) {{}}
+    themeBtns.forEach(function (b) {{
+      b.setAttribute('aria-pressed', String(b.dataset.themeSet === mode));
+    }});
+  }}
+  themeBtns.forEach(function (b) {{
+    b.addEventListener('click', function () {{ applyTheme(b.dataset.themeSet); }});
+  }});
+  applyTheme(readTheme());
+
+  /* ---------- vybavené ponuky ---------- */
+  var done = {{}};
+  try {{
+    (JSON.parse(localStorage.getItem('nsk.done') || '[]') || []).forEach(function (id) {{
+      done[id] = true;
+    }});
+  }} catch (e) {{}}
+  function saveDone() {{
+    try {{ localStorage.setItem('nsk.done', JSON.stringify(Object.keys(done))); }} catch (e) {{}}
+  }}
+  try {{ hideDone.checked = localStorage.getItem('nsk.hidedone') === '1'; }} catch (e) {{}}
+
+  all.forEach(function (row) {{
+    var box = row.querySelector('.done');
+    // Nastaviť oba smery: prehliadač po obnovení stránky vracia predchádzajúci
+    // stav zaškrtnutia, ktorý nemusí zodpovedať uloženým údajom.
+    var isDone = !!done[row.dataset.id];
+    box.checked = isDone;
+    row.classList.toggle('is-done', isDone);
+    box.addEventListener('change', function () {{
+      if (box.checked) {{ done[row.dataset.id] = true; }}
+      else {{ delete done[row.dataset.id]; }}
+      row.classList.toggle('is-done', box.checked);
+      saveDone();
+      if (hideDone.checked) draw();
+      else updateCount();
+    }});
+  }});
+
+  /* ---------- čas scrapu v miestnom čase ---------- */
+  [].slice.call(document.querySelectorAll('time.seen')).forEach(function (el) {{
+    var iso = el.dataset.iso;
+    if (!iso) return;
+    var d = new Date(iso);
+    if (isNaN(d)) return;
+    var p = function (n) {{ return (n < 10 ? '0' : '') + n; }};
+    el.textContent = p(d.getDate()) + '.' + p(d.getMonth() + 1) + '. ' +
+                     p(d.getHours()) + ':' + p(d.getMinutes());
+    el.setAttribute('datetime', iso);
+    el.title = 'Scraper túto ponuku prvýkrát zachytil ' + d.toLocaleString('sk-SK');
+  }});
+
+  /* ---------- filtrovanie a zoradenie ---------- */
+  var visible = [];
+  function updateCount() {{
+    var doneShown = visible.filter(function (r) {{ return done[r.dataset.id]; }}).length;
+    var filtered = q.value.trim() || typ.value || okres || hideDone.checked;
+    var base = filtered
+      ? 'Zobrazených ' + visible.length + ' z ' + all.length
+      : all.length + ' ponúk';
+    var total = Object.keys(done).length;
+    count.textContent = base + (total ? ' · ' + total + ' vybavených' : '');
+  }}
+
   function draw() {{
     var term = q.value.trim().toLowerCase(), t = typ.value;
-    var vis = all.filter(function (r) {{
+    visible = all.filter(function (r) {{
       return (!term || r.dataset.s.indexOf(term) !== -1)
           && (!t || r.dataset.t === t)
-          && (!okres || r.dataset.o === okres);
+          && (!okres || r.dataset.o === okres)
+          && (!hideDone.checked || !done[r.dataset.id]);
     }});
 
     var s = sort.value;
-    vis.sort(function (a, b) {{
+    visible.sort(function (a, b) {{
       if (s === 'loc') return a.querySelector('.place').textContent
                               .localeCompare(b.querySelector('.place').textContent, 'sk');
       if (s === 'old') return a.dataset.d.localeCompare(b.dataset.d);
       return b.dataset.d.localeCompare(a.dataset.d);
     }});
 
-    list.replaceChildren.apply(list, vis);
-    var filtered = term || t || okres;
-    empty.hidden = vis.length > 0;
-    list.hidden = vis.length === 0;
-    reset.hidden = !filtered;
-    count.textContent = filtered
-      ? 'Zobrazených ' + vis.length + ' z ' + all.length
-      : all.length + ' ponúk';
+    list.replaceChildren.apply(list, visible);
+    empty.hidden = visible.length > 0;
+    list.hidden = visible.length === 0;
+    reset.hidden = !(term || t || okres);
+    updateCount();
   }}
 
   chips.forEach(function (c) {{
@@ -412,6 +554,11 @@ def write(path: str | Path, listings: list[Listing],
     q.value = ''; typ.value = ''; okres = null;
     chips.forEach(function (x) {{ x.setAttribute('aria-pressed', 'false'); }});
     draw(); q.focus();
+  }});
+
+  hideDone.addEventListener('change', function () {{
+    try {{ localStorage.setItem('nsk.hidedone', hideDone.checked ? '1' : '0'); }} catch (e) {{}}
+    draw();
   }});
 
   q.addEventListener('input', draw);

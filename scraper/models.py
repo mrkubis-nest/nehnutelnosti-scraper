@@ -31,6 +31,9 @@ class Listing:
     advertiser_type: str = ""
     created_at: str = ""
     updated_at: str = ""
+    # Kedy ponuku prvýkrát zachytil scraper. Dopĺňa sa až pri čítaní
+    # z databázy, v surových dátach z webu tento údaj nie je.
+    first_seen: str = ""
     description: str = ""
     photo: str = ""
     photos: list[str] = field(default_factory=list)

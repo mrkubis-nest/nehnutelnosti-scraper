@@ -112,7 +112,8 @@ class Store:
         tie sú s najväčšou pravdepodobnosťou predané alebo stiahnuté a viedli
         by na neexistujúcu stránku.
         """
-        sql = "SELECT raw FROM listings WHERE advertiser_type='PRIVATE_PERSON'"
+        sql = ("SELECT raw, first_seen FROM listings "
+               "WHERE advertiser_type='PRIVATE_PERSON'")
         params: list = []
         if seen_within_days:
             cutoff = datetime.now(timezone.utc) - timedelta(days=int(seen_within_days))
@@ -124,9 +125,11 @@ class Store:
         out = []
         for r in rows:
             try:
-                out.append(Listing(**json.loads(r["raw"])))
+                listing = Listing(**json.loads(r["raw"]))
             except (json.JSONDecodeError, TypeError):
                 continue
+            listing.first_seen = r["first_seen"] or ""
+            out.append(listing)
         return out
 
     def stats(self) -> dict:
