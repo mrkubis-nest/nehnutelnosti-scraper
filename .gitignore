@@ -8,6 +8,10 @@ data/ponuky.csv
 data/ponuky.html
 data/ponuky.xlsx
 
+# Lokálny náhľad. Priečinok public/ vytvára GitHub Actions – keby doň
+# zapisoval aj tento počítač, každý pull by končil konfliktom.
+preview/
+
 *.log
 __pycache__/
 *.py[cod]
