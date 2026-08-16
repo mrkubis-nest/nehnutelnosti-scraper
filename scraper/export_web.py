@@ -98,9 +98,19 @@ def write(path: str | Path, listings: list[Listing],
     p.parent.mkdir(parents=True, exist_ok=True)
     new_ids = new_ids or set()
 
-    week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+    now = datetime.now(timezone.utc)
+    week_ago = now - timedelta(days=7)
+    day_ago = now - timedelta(hours=24)
+
     last_week = sum(1 for l in listings
                     if (d := _parse(l.created_at)) and d >= week_ago)
+
+    # Prírastok sa počíta z času prvého zachytenia, nie z toho, čo našiel
+    # práve tento beh. Inak by po behu, ktorý nič nenašiel, číslo spadlo
+    # na nulu a značky NOVÉ by zmizli, hoci ráno niečo pribudlo.
+    recent = {l.id for l in listings
+              if (d := _parse(l.first_seen)) and d >= day_ago}
+    badge_ids = set(new_ids) | recent
 
     okresy = Counter(_short_district(l.district) for l in listings)
     typy = sorted({cat_sk(l) for l in listings})
@@ -376,8 +386,8 @@ def write(path: str | Path, listings: list[Listing],
 
   <div class="stats">
     <div class="stat"><b>{len(listings)}</b><span>ponúk celkom</span></div>
-    <div class="stat hl"><b>{len(new_ids)}</b><span>nových dnes</span></div>
-    <div class="stat"><b>{last_week}</b><span>za týždeň</span></div>
+    <div class="stat hl"><b>{len(badge_ids)}</b><span>pribudlo za 24 h</span></div>
+    <div class="stat"><b>{last_week}</b><span>zverejnené za 7 dní</span></div>
     <div class="stat"><b>{len(okresy)}</b><span>okresov</span></div>
   </div>
 </header>
@@ -415,13 +425,14 @@ def write(path: str | Path, listings: list[Listing],
 </div>
 
 <ul class="list" id="list">
-{_rows(listings, new_ids)}
+{_rows(listings, badge_ids)}
 </ul>
 <p class="empty" id="empty" hidden>Nič nesedí. Skús zmeniť filtre.</p>
 
 <footer>
-  <span>Aktualizované <b>{datetime.now().strftime('%d.%m.%Y o %H:%M')}</b></span>
-  <span class="mono">zdroj nehnutelnosti.sk</span>
+  <span>Naposledy skontrolované
+    <b><time class="gen" data-iso="{now.isoformat()}">…</time></b></span>
+  <span class="mono">zdroj nehnutelnosti.sk · kontrola 3× denne</span>
 </footer>
 
 </div>
@@ -489,18 +500,36 @@ def write(path: str | Path, listings: list[Listing],
     }});
   }});
 
-  /* ---------- čas scrapu v miestnom čase ---------- */
+  /* ---------- časy v miestnom čase prehliadača ----------
+     Workflow beží v UTC, takže časy zo servera by boli v lete o dve
+     hodiny posunuté. Prepočítavajú sa preto až tu. */
+  var p2 = function (n) {{ return (n < 10 ? '0' : '') + n; }};
+
   [].slice.call(document.querySelectorAll('time.seen')).forEach(function (el) {{
     var iso = el.dataset.iso;
     if (!iso) return;
     var d = new Date(iso);
     if (isNaN(d)) return;
-    var p = function (n) {{ return (n < 10 ? '0' : '') + n; }};
-    el.textContent = p(d.getDate()) + '.' + p(d.getMonth() + 1) + '. ' +
-                     p(d.getHours()) + ':' + p(d.getMinutes());
+    el.textContent = p2(d.getDate()) + '.' + p2(d.getMonth() + 1) + '. ' +
+                     p2(d.getHours()) + ':' + p2(d.getMinutes());
     el.setAttribute('datetime', iso);
     el.title = 'Scraper túto ponuku prvýkrát zachytil ' + d.toLocaleString('sk-SK');
   }});
+
+  var gen = document.querySelector('time.gen');
+  if (gen && gen.dataset.iso) {{
+    var g = new Date(gen.dataset.iso);
+    if (!isNaN(g)) {{
+      var mins = Math.round((Date.now() - g.getTime()) / 60000);
+      var ago = mins < 2 ? 'práve teraz'
+              : mins < 60 ? 'pred ' + mins + ' min'
+              : mins < 1440 ? 'pred ' + Math.round(mins / 60) + ' h'
+              : 'pred ' + Math.round(mins / 1440) + ' dňami';
+      gen.textContent = p2(g.getDate()) + '.' + p2(g.getMonth() + 1) + '. o ' +
+                        p2(g.getHours()) + ':' + p2(g.getMinutes()) + ' (' + ago + ')';
+      gen.setAttribute('datetime', gen.dataset.iso);
+    }}
+  }}
 
   /* ---------- filtrovanie a zoradenie ---------- */
   var visible = [];
