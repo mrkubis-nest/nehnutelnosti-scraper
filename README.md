@@ -1,8 +1,12 @@
 # Nehnuteľnosti.sk — ponuky priamo od majiteľa
 
-Automaticky prehľadáva **nehnutelnosti.sk**, vyberie ponuky na **predaj v Bratislavskom
-kraji, ktoré sú priamo od majiteľa** (bez realitnej kancelárie), a uloží ich
-do lokálnej excelovskej databázy **`data/ponuky.xlsx`**.
+Automaticky prehľadáva **nehnutelnosti.sk**, vyberie ponuky na **predaj, ktoré sú
+priamo od majiteľa** (bez realitnej kancelárie), a uloží ich do excelovskej
+databázy **`ponuky.xlsx`** aj na webstránku.
+
+Sledované okresy sa nastavujú v `config.yaml`. Momentálne celý **Bratislavský kraj**
+(Bratislava I–V, Malacky, Pezinok, Senec) a tri okresy **Trnavského kraja**
+(Dunajská Streda, Trnava, Galanta).
 
 Súbor sa pri každom behu prepíše celý z databázy, takže vždy obsahuje kompletný
 a aktuálny zoznam — nie len posledný prírastok. Obsahuje dva hárky:
@@ -54,11 +58,16 @@ Web nemá filter „priamo od majiteľa" v URL a stránkovanie končí na **33. 
 2. **Číta dáta priamo zo SSR**. Web beží na Next.js a kompletné údaje o inzerátoch
    posiela v HTML ako JSON. Scraper ich vytiahne odtiaľ, nie z HTML tried — tie sa
    menia pri každom builde webu, JSON nie.
-3. **Filtruje na majiteľov** podľa poľa `advertiser.type == "PRIVATE_PERSON"`, čo je
+3. **Dobehne obcami, čo sa nezmestí.** Kategória `domy` nemá na webe žiadne
+   podkategórie, takže okres s viac než 990 domami sa inak rozdeliť nedá —
+   v okrese Dunajská Streda (1 139 domov) by 176 ponúk ostalo nedostupných.
+   Pre takýto okres je v `config.yaml` pod `district_fallback` zoznam obcí,
+   ktorými sa zvyšok dobehne. Prekryv nevadí, ponuky sa zlučujú podľa id.
+4. **Filtruje na majiteľov** podľa poľa `advertiser.type == "PRIVATE_PERSON"`, čo je
    presne to, čo web zobrazuje ako štítok „Priamo od majiteľa".
-4. **Odsieva firmy podľa mena inzerenta** — viď nižšie.
-5. **Zahodí ponuky staršie ako 4 mesiace** (`max_age_days: 120` v `config.yaml`).
-6. **Porovná s databázou** (`data/seen.sqlite3`), aby označil, čo je naozaj nové.
+5. **Odsieva firmy podľa mena inzerenta** — viď nižšie.
+6. **Zahodí ponuky staršie ako 4 mesiace** (`max_age_days: 120` v `config.yaml`).
+7. **Porovná s databázou** (`data/seen.sqlite3`), aby označil, čo je naozaj nové.
 
 ### Prečo dve vrstvy filtrovania realitiek
 

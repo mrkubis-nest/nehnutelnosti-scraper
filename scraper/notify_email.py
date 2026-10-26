@@ -88,7 +88,7 @@ def build_html(listings: list[Listing]) -> str:
         {n} {word} priamo od majiteľa
       </h1>
       <p style="margin:0 0 20px;color:#6b7480;font-size:14px">
-        Bratislavský kraj · predaj · nehnutelnosti.sk
+        Predaj · nehnutelnosti.sk
       </p>
       {cards}
       <p style="margin:24px 0 0;color:#9aa2ad;font-size:12px;text-align:center">
@@ -100,7 +100,7 @@ def build_html(listings: list[Listing]) -> str:
 
 
 def build_text(listings: list[Listing]) -> str:
-    lines = [f"{len(listings)} nových ponúk priamo od majiteľa (Bratislavský kraj, predaj)", ""]
+    lines = [f"{len(listings)} nových ponúk priamo od majiteľa (predaj)", ""]
     for i, l in enumerate(listings, 1):
         lines += [
             f"{i}. {l.title}",
@@ -125,7 +125,7 @@ def send(settings: Settings, listings: list[Listing]) -> bool:
     n = len(listings)
     msg = EmailMessage()
     msg["Subject"] = (
-        f"🏠 {n} {'nová ponuka' if n == 1 else 'nových ponúk'} od majiteľa – Bratislavský kraj"
+        f"🏠 {n} {'nová ponuka' if n == 1 else 'nových ponúk'} od majiteľa"
         if n else "🏠 Žiadne nové ponuky od majiteľa"
     )
     msg["From"] = formataddr(("Nehnuteľnosti scraper", settings.email_from))

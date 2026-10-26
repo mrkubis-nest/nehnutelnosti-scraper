@@ -7,13 +7,14 @@
 
 transaction: predaj          # predaj | prenajom
 
-# Okresy Bratislavského kraja (slugy z URL webu).
+# Sledované okresy (slugy z URL webu).
 #
 # POZOR na prefix `okres-`: slug `senec` znamená MESTO Senec (138 domov),
 # kým `okres-senec` je celý okres (773 domov). Bez prefixu by scraper
-# prehliadol ~29 % ponúk v kraji. Pri Bratislave I–V sú obe formy zhodné,
+# prehliadol ~29 % ponúk. Pri Bratislave I–V sú obe formy zhodné,
 # prefix je tam pre konzistenciu.
 districts:
+  # Bratislavský kraj
   - okres-bratislava-i
   - okres-bratislava-ii
   - okres-bratislava-iii
@@ -22,6 +23,10 @@ districts:
   - okres-malacky
   - okres-pezinok
   - okres-senec
+  # Trnavský kraj
+  - okres-dunajska-streda
+  - okres-trnava
+  - okres-galanta
 
 # Hlavné kategórie. `subcategories` sa použijú len ak partícia prekročí
 # limit stránkovania – vtedy sa rozdelí ešte jemnejšie.
@@ -105,3 +110,74 @@ exclude_advertiser_patterns:
 # Technický limit stránkovania webu – needituj, ak sa web nezmení.
 page_size: 30
 max_pages: 33
+
+# Okres, ktorý je aj po rozdelení na kategórie väčší než limit stránkovania
+# (33 strán = 990 ponúk), sa dobehne po obciach. Kategória `domy` nemá na webe
+# žiadne podkategórie, takže v okrese Dunajská Streda (1 139 domov) by sa inak
+# 176 ponúk nedalo vôbec načítať.
+#
+# Zoznam je odvodený z dát samotných inzerátov a každý slug bol overený.
+district_fallback:
+  okres-dunajska-streda:
+    - dunajska-streda
+    - samorin
+    - velky-meder
+    - gabcikovo
+    - hviezdoslavov
+    - vydrany
+    - dolny-bar
+    - kvetoslavov
+    - lehnice
+    - topolniky
+    - holice
+    - dunajsky-klatov
+    - michal-na-ostrove
+    - horne-myto
+    - vojka-nad-dunajom
+    - vrakun
+    - horny-bar
+    - horna-poton
+    - kutniky
+    - trhova-hradska
+    - oldza
+    - velke-blahovo
+    - dolny-stal
+    - okoc
+    - velka-paka
+    - velke-dvorniky
+    - dobrohost
+    - kralovicove-kracany
+    - orechova-poton
+    - bellova-ves
+    - novy-zivot
+    - hubice
+    - padan
+    - kostolne-kracany
+    - mad
+    - ohrady
+    - bac
+    - povoda
+    - balon
+    - macov
+    - kyselica
+    - jahodna
+    - rohovce
+    - stvrtok-na-ostrove
+    - male-dvorniky
+    - blahova
+    - medvedov
+    - luc-na-ostrove
+    - zlate-klasy
+    - patas
+    - sap
+    - bodiky
+    - cenkovce
+    - trstena-na-ostrove
+    - potonske-luky
+    - narad
+    - cilizska-radvan
+    - jurova
+    - janiky
+    - cakany
+    - baka
+    - blatna-na-ostrove

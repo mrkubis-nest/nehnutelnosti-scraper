@@ -38,6 +38,19 @@ def _group(typ: str) -> str:
     return "ine"
 
 
+def _region_label(listings: list[Listing]) -> str:
+    """Názov sledovaného územia odvodený z dát, nie natvrdo zapísaný."""
+    kraje = sorted({(l.county or "").replace(" kraj", "").strip()
+                    for l in listings if l.county})
+    if not kraje:
+        return "Slovensko"
+    if len(kraje) == 1:
+        return f"{kraje[0]} kraj"
+    if len(kraje) == 2:
+        return f"{kraje[0]} a {kraje[1]} kraj"
+    return ", ".join(kraje[:-1]) + f" a {kraje[-1]} kraj"
+
+
 def _short_district(d: str) -> str:
     return (d or "").replace("okres ", "").strip() or "Neuvedené"
 
@@ -112,6 +125,7 @@ def write(path: str | Path, listings: list[Listing],
               if (d := _parse(l.first_seen)) and d >= day_ago}
     badge_ids = set(new_ids) | recent
 
+    region = _region_label(listings)
     okresy = Counter(_short_district(l.district) for l in listings)
     typy = sorted({cat_sk(l) for l in listings})
 
@@ -129,8 +143,8 @@ def write(path: str | Path, listings: list[Listing],
 <html lang="sk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex">
-<meta name="description" content="Ponuky nehnuteľností priamo od majiteľa v Bratislavskom kraji, bez realitných kancelárií.">
-<title>Priamo od majiteľa — Bratislavský kraj</title>
+<meta name="description" content="Ponuky nehnuteľností priamo od majiteľa, bez realitných kancelárií.">
+<title>Priamo od majiteľa — {region}</title>
 <script>
   // Beží pred vykreslením, inak by pri načítaní preblikla nesprávna téma.
   try {{
@@ -377,7 +391,7 @@ def write(path: str | Path, listings: list[Listing],
 <div class="wrap">
 
 <header>
-  <p class="kicker">Bratislavský kraj · predaj</p>
+  <p class="kicker">{region} · predaj</p>
   <h1>Priamo od majiteľa</h1>
   <p class="tagline">
     Ponuky bez realitných kancelárií, zozbierané z nehnutelnosti.sk.

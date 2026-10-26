@@ -161,7 +161,7 @@ def write_html(path: str | Path, listings: list[Listing],
     doc = f"""<!doctype html>
 <html lang="sk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Ponuky priamo od majiteľa – Bratislavský kraj</title>
+<title>Ponuky priamo od majiteľa</title>
 <style>
  :root {{ --bg:#f4f6f8; --card:#fff; --line:#e3e7ec; --ink:#12263f;
           --muted:#6b7480; --green:#0b7a52; }}
@@ -204,7 +204,7 @@ def write_html(path: str | Path, listings: list[Listing],
    .body {{ padding:0 16px 16px; }} }}
 </style></head><body><div class="wrap">
 <h1>Ponuky priamo od majiteľa</h1>
-<p class="sub">Bratislavský kraj · predaj · bez realitných kancelárií<br>
+<p class="sub">Predaj · bez realitných kancelárií<br>
 Aktualizované {generated} · {len(listings)} ponúk</p>
 
 <div class="bar">
