@@ -23,7 +23,7 @@ from scraper.crawler import Crawler
 from scraper.fetcher import Fetcher
 from scraper.models import PRIVATE_OWNER, Listing
 from scraper.store import Store
-from scraper import (export_excel, export_local, export_web, filters,
+from scraper import (enrich, export_excel, export_local, export_web, filters,
                      notify_email, sheets)
 
 log = logging.getLogger("run")
@@ -115,7 +115,29 @@ def main() -> int:
     crawler = Crawler(fetcher, cfg)
 
     all_listings = crawler.crawl()
+
+    # Keď web zmení štruktúru dát, parser prestane nachádzať inzeráty, ale
+    # počty z partícií sa čítajú ďalej – beh by inak tvaril, že je v poriadku.
+    # Toto ho zhodí, aby prišlo upozornenie z GitHubu.
+    expected = crawler.stats.get("expected", 0)
+    if expected >= 100 and len(all_listings) < expected * 0.5:
+        log.error("Nazbieraných len %d inzerátov, hoci partície hlásili %d. "
+                  "Web pravdepodobne zmenil štruktúru dát a parser ju nečíta.",
+                  len(all_listings), expected)
+        store_check = Store(settings.db_path)
+        store_check.log_run(len(all_listings), 0, 0)
+        store_check.close()
+        return 1
+
     owners = [l for l in all_listings if l.advertiser_type == PRIVATE_OWNER]
+
+    # Dátum zverejnenia už nie je vo výsledkoch vyhľadávania, dotiahneme ho
+    # z detailov. Robí sa to pred filtrovaním, lebo filter na vek ho používa.
+    store = Store(settings.db_path)
+    enrich.add_created_at(
+        fetcher, owners, store.known_created_at([l.id for l in owners])
+    )
+
     private = filters.apply_all(owners, cfg)
     private.sort(key=lambda l: l.created_at, reverse=True)
 
@@ -128,7 +150,6 @@ def main() -> int:
             log.warning("Partícia '%s' (%d ponúk) presiahla limit stránkovania – "
                         "zváž jemnejšie delenie v config.yaml", label, total)
 
-    store = Store(settings.db_path)
     first_run = store.is_first_run
 
     if args.all:

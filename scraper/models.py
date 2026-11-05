@@ -47,29 +47,30 @@ class Listing:
 
     @classmethod
     def from_raw(cls, raw: dict[str, Any], resolve=None) -> "Listing":
-        """Poskladá Listing z objektu vytiahnutého zo SSR dát webu.
+        """Poskladá Listing z objektu, ktorý vrátil `fetcher.parse_listings`.
 
-        `resolve` je voliteľná funkcia na rozbalenie RSC referencií
-        (web niektoré dlhé texty ukladá ako odkaz typu "$33").
+        `resolve` rozbalí RSC referencie – web niektoré dlhé texty
+        posiela ako odkaz typu "$33".
         """
-        resolve = resolve or (lambda v: v if isinstance(v, str) and not v.startswith("$") else "")
+        resolve = resolve or (
+            lambda v: v if isinstance(v, str) and not v.startswith("$") else ""
+        )
 
-        params = raw.get("parameters") or {}
-        cat = params.get("category") or {}
+        cat = raw.get("category") or {}
         loc = raw.get("location") or {}
         adv = raw.get("advertiser") or {}
         price = raw.get("price") or {}
-        if not isinstance(price, dict):  # niekedy je to referencia
+        if not isinstance(price, dict):
             price = {}
 
-        photos = [
-            p["url"] for p in (raw.get("photos") or [])
-            if isinstance(p, dict) and p.get("url")
-        ]
-
         listing_id = raw.get("id", "")
-        sef = raw.get("sefName") or ""
-        url = f"{BASE_URL}/detail/{listing_id}/{sef}" if sef else f"{BASE_URL}/detail/{listing_id}"
+        slug = raw.get("slug") or ""
+        url = f"{BASE_URL}/detail/{listing_id}"
+        if slug:
+            url += f"/{slug}"
+
+        photo = raw.get("photoUrl") or ""
+        area = raw.get("area")
 
         return cls(
             id=listing_id,
@@ -78,19 +79,22 @@ class Listing:
             price=str(price.get("price") or ""),
             price_num=price.get("priceNum") if isinstance(price.get("priceNum"), int) else None,
             unit_price=str(price.get("unitPrice") or ""),
-            area=params.get("area") if isinstance(params.get("area"), (int, float)) else None,
+            area=area if isinstance(area, (int, float)) else None,
             category=str(cat.get("subValue") or cat.get("mainValue") or ""),
-            transaction=str(params.get("transaction") or ""),
-            state=str(params.get("realEstateState") or ""),
-            location=str(loc.get("name") or ""),
+            transaction=str(raw.get("transaction") or ""),
+            state=str(raw.get("realEstateState") or ""),
+            # Štruktúrovaná adresa je presnejšia; mesto a okres sú zvlášť.
+            location=str(raw.get("address") or loc.get("name") or ""),
             city=str(loc.get("city") or ""),
             district=str(loc.get("district") or ""),
             county=str(loc.get("county") or ""),
             advertiser_name=str(adv.get("name") or ""),
             advertiser_type=str(adv.get("type") or ""),
+            # Dátum zverejnenia už web v zozname neposiela – dopĺňa sa
+            # z detailovej stránky, viď scraper/enrich.py.
             created_at=str(raw.get("createdAt") or ""),
             updated_at=str(raw.get("updatedAt") or ""),
             description=(resolve(raw.get("description")) or "").strip(),
-            photo=photos[0] if photos else "",
-            photos=photos,
+            photo=photo,
+            photos=[photo] if photo else [],
         )

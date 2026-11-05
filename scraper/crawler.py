@@ -32,7 +32,7 @@ class Crawler:
         self.page_size = int(config.get("page_size", 30))
         self.max_pages = int(config.get("max_pages", 33))
         self.reachable = self.page_size * self.max_pages
-        self.stats = {"requests": 0, "pages": 0, "over_cap": []}
+        self.stats = {"requests": 0, "pages": 0, "over_cap": [], "expected": 0}
 
     # ── jedna stránka ────────────────────────────────────────────────────
     def _fetch_page(self, category, district, page):
@@ -94,6 +94,9 @@ class Crawler:
                 self.stats["over_cap"].append((part.label, total))
 
         pages = min((total + self.page_size - 1) // self.page_size, self.max_pages)
+        # Koľko inzerátov sa z tejto partície dá vôbec stiahnuť – slúži
+        # na kontrolu, či parser po zmene webu ešte funguje.
+        self.stats["expected"] += min(total, self.reachable)
         self._collect(first, out, expect_district)
         self.stats["pages"] += 1
         log.info("  %-46s %5d ponúk / %2d strán", part.label, total, pages)

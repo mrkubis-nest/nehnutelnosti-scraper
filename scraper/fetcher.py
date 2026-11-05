@@ -22,7 +22,12 @@ log = logging.getLogger(__name__)
 BASE_URL = "https://www.nehnutelnosti.sk"
 
 _PUSH = re.compile(r'self\.__next_f\.push\(\[1,\s*("(?:[^"\\]|\\.)*")\]\)')
-_AD_START = re.compile(r'\{"id":"[A-Za-z0-9_-]{6,}","title":"')
+# Web od novembra 2026 posiela inzeráty v dvoch oddelených poliach, ktoré
+# sa musia spojiť podľa id:
+#   advertisementGtmItems  – inzerent a jeho typ, lokalita, cena, kategória
+#   items[].advertisement  – slug do odkazu, plocha, adresa, slovenský názov typu
+_GTM_START = re.compile(r'\{"photoUrl":"')
+_ITEM_START = re.compile(r'\{"advertisement":\{')
 _TOTAL = re.compile(r'"totalCount":(\d+)')
 _TEXT_ROW = re.compile(r'(?:^|\n)([0-9a-f]+):T([0-9a-f]+),')
 _STR_ROW = re.compile(r'(?:^|\n)([0-9a-f]+):("(?:[^"\\]|\\.)*")')
@@ -157,8 +162,25 @@ def make_resolver(flight: str):
     return resolve
 
 
+def _objects(flight: str, anchor: re.Pattern):
+    """Prejde všetky JSON objekty začínajúce daným vzorom."""
+    for match in anchor.finditer(flight):
+        raw = _balanced_object(flight, match.start())
+        if not raw:
+            continue
+        try:
+            yield json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+
+
 def parse_listings(html: str) -> tuple[list[dict], int | None]:
-    """Vytiahne zo stránky surové objekty inzerátov a celkový počet výsledkov."""
+    """Vytiahne zo stránky inzeráty a celkový počet výsledkov.
+
+    Spája dve polia, ktoré web posiela oddelene. Prvé nesie typ inzerenta
+    (bez neho by sa nedalo filtrovať na majiteľov), druhé slug do odkazu
+    a plochu. Spoločným kľúčom je id inzerátu.
+    """
     flight = flight_text(html)
     if not flight:
         return [], None
@@ -168,24 +190,36 @@ def parse_listings(html: str) -> tuple[list[dict], int | None]:
     if m:
         total = int(m.group(1))
 
-    results: list[dict] = []
-    seen: set[str] = set()
-    for match in _AD_START.finditer(flight):
-        raw = _balanced_object(flight, match.start())
-        if not raw:
-            continue
-        try:
-            obj = json.loads(raw)
-        except json.JSONDecodeError:
-            continue
-        # Skutočný inzerát má inzerenta aj cenu; ostatné objekty (projekty,
-        # navigačné odkazy) preskočíme.
-        if "advertiser" not in obj or "price" not in obj:
-            continue
-        if obj.get("id") in seen:
-            continue
-        seen.add(obj["id"])
-        results.append(obj)
+    gtm: dict[str, dict] = {}
+    for obj in _objects(flight, _GTM_START):
+        if obj.get("id") and "advertiser" in obj and "price" in obj:
+            gtm.setdefault(obj["id"], obj)
+
+    detail: dict[str, dict] = {}
+    for obj in _objects(flight, _ITEM_START):
+        ad = obj.get("advertisement") or {}
+        if ad.get("id"):
+            detail.setdefault(ad["id"], ad)
+
+    results = []
+    for ad_id, g in gtm.items():
+        d = detail.get(ad_id, {})
+        results.append({
+            "id": ad_id,
+            "title": g.get("title") or d.get("title") or "",
+            "slug": d.get("slug") or "",
+            "location": g.get("location") or {},
+            "address": (d.get("address") or {}).get("location") or "",
+            "advertiser": g.get("advertiser") or {},
+            "price": g.get("price") or {},
+            "category": g.get("category") or {},
+            "subcategory": d.get("subcategory") or "",
+            "area": d.get("area"),
+            "transaction": d.get("transaction") or "",
+            "realEstateState": g.get("realEstateState") or d.get("realEstateState") or "",
+            "photoUrl": g.get("photoUrl") or "",
+            "description": d.get("description") or "",
+        })
 
     return results, total
 

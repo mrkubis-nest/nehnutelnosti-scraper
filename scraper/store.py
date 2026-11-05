@@ -105,6 +105,21 @@ class Store:
         )
         self.conn.commit()
 
+    def known_created_at(self, ids: list[str]) -> dict[str, str]:
+        """Už uložené dátumy zverejnenia, aby sa detaily nesťahovali zbytočne."""
+        if not ids:
+            return {}
+        out: dict[str, str] = {}
+        for i in range(0, len(ids), 500):
+            chunk = ids[i:i + 500]
+            rows = self.conn.execute(
+                "SELECT id, created_at FROM listings WHERE id IN (%s)"
+                % ",".join("?" * len(chunk)), chunk)
+            for r in rows:
+                if r["created_at"]:
+                    out[r["id"]] = r["created_at"]
+        return out
+
     def all_private(self, seen_within_days: int | None = None) -> list[Listing]:
         """Ponuky od majiteľa z databázy, od najnovšej.
 
